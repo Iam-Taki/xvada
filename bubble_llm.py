@@ -1,5 +1,5 @@
-from openai import OpenAI
-client = OpenAI()
+#from openai import OpenAI
+#client = OpenAI()
 
 # You are an AI assistant. You will help to build parse trees from flat tree levels.
 #     You will combine adjacent nodes from a tree level. Those nodes will be placed under a new parent node at that position.

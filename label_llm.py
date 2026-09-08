@@ -1,6 +1,6 @@
-from openai import OpenAI
+#from openai import OpenAI
 import re
-client = OpenAI()
+#client = OpenAI()
 
 SYSTEM_PROMPT = (
     "You are an AI assistant. You will label the internal nodes in the parse tree of any arbitrary program. "

@@ -1,5 +1,5 @@
-from openai import OpenAI
-client = OpenAI()
+#from openai import OpenAI
+#client = OpenAI()
 
 # You are an AI assistant. You will be given a list of tree levels.
 # You will find out segment pairs from these levels in a way that a segment pair can be derived from the same AST node.
