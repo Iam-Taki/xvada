@@ -25,6 +25,7 @@ Bulk of the Arvada algorithm.
 """
 
 ###################### Settings for ICSE'24 Submission #########################
+CALL_SITE_COUNTS = {'check_recall': 0, 'build_naive_parse_trees': 0, 'hdd_try_parse_seed': 0, 'hdd_try_parse_depth1': 0}
 # MAX_SAMPLES_PER_COALESCE = 50   << number of strings to sample from the     #
 #                                   grammar induced by a marge. Increase to   #
 #                                   increase chance of catching unsound       #
@@ -75,6 +76,7 @@ def check_recall(oracle, grammar: Grammar):
     positives = grammar.sample_positives(10, 10)
     for pos in positives:
         try:
+            CALL_SITE_COUNTS['check_recall'] += 1
             oracle.parse(pos)
         except:
             return False
@@ -134,6 +136,7 @@ def build_start_grammar(oracle, leaves, bbl_bounds = (3,10)):
         hdd_grammar = minimize(hdd_grammar)
         print(str(hdd_grammar))
         
+    print(f'Call site breakdown: {CALL_SITE_COUNTS}')
     return grammar, hdd_grammar
 
 
@@ -211,6 +214,7 @@ def build_naive_parse_trees(leaves: List[List[ParseNode]], bracket_items: List, 
         new_children.update_cache_info()
         try:
 
+            CALL_SITE_COUNTS['build_naive_parse_trees'] += 1
             oracle.parse(new_children.derived_string())
 
         except:
@@ -249,6 +253,7 @@ def hdd_decompose(trees: List[ParseNode], oracle: ExternalOracle, new_trees: dic
             seed = node.derived_string()
             if seed in cache_str and not cache_str[seed]:
                 return False
+            CALL_SITE_COUNTS['hdd_try_parse_seed'] += 1
             oracle.parse(seed)
             cache_str[seed] = True
             # seed = seed.replace(" ", "")
@@ -272,6 +277,7 @@ def hdd_decompose(trees: List[ParseNode], oracle: ExternalOracle, new_trees: dic
                             continue
                         else:
                             return False
+                    CALL_SITE_COUNTS['hdd_try_parse_depth1'] += 1
                     oracle.parse(s)
                     cache_str[s] = True
                 new_trees[seed] = node.copy()
@@ -1325,6 +1331,19 @@ def coalesce(oracle, trees: List[ParseNode], grammar: Grammar,
     """
 
 
+    def get_signature(strings):
+        """Cheap character-class fingerprint of a set of derivable strings."""
+        if not strings:
+            return set()
+        all_chars = ''.join(strings)
+        sig = set()
+        if any(c.isdigit() for c in all_chars): sig.add('digit')
+        if any(c.isalpha() and c.islower() for c in all_chars): sig.add('lower')
+        if any(c.isalpha() and c.isupper() for c in all_chars): sig.add('upper')
+        if any(c in ' \t\n\r' for c in all_chars): sig.add('space')
+        if any(not c.isalnum() and c not in ' \t\n\r' for c in all_chars): sig.add('symbol')
+        return sig
+
     def replacement_valid_and_expanding(nt1, nt2, trees: ParseTreeList):
         """
         Returns true if nt1 and nt2 can be merged in the grammar while expanding the set of inputs accepted
@@ -1341,6 +1360,13 @@ def coalesce(oracle, trees: List[ParseNode], grammar: Grammar,
             nt1_derivable_strings = lvl_n_derivable(trees, nt1, 0)
             nt2_derivable_strings = lvl_n_derivable(trees, nt2, 0)
         TIME_GENERATING_EXAMPLES += time.time() - s
+
+        # --- Cheap pre-filter: skip oracle entirely if signatures are disjoint ---
+        sig1 = get_signature(nt1_derivable_strings)
+        sig2 = get_signature(nt2_derivable_strings)
+        if sig1 and sig2 and not (sig1 & sig2):
+            return False
+        # --- end pre-filter ---
 
         # First check if the replacement is expanding
         if MUST_EXPAND_IN_COALESCE and coalesce_target is not None and nt1_derivable_strings == nt2_derivable_strings:
