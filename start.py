@@ -978,9 +978,13 @@ def coalesce_partial(oracle, trees: List[ParseNode], grammar: Grammar,
                 for candidate in candidate_strs:
                     candidate_index += 1
                     oracle.parse(candidate)
+                with open("first_reject_log.csv", "a", encoding="utf-8") as frlog:
+                    frlog.write(f"{len(candidate_strs)}|{candidate_index}|ALL_PASSED\n")
                 replacing_positions[(rule[0], tuple(rule[1]))].append(posn)
                 language_expanded = True
             except ParseException as e:
+                with open("first_reject_log.csv", "a", encoding="utf-8") as frlog:
+                    frlog.write(f"{len(candidate_strs)}|{candidate_index}|REJECTED\n")
                 continue
 
         if MUST_EXPAND_IN_PARTIAL and coalesce_target is not None and not language_expanded:
@@ -1205,11 +1209,17 @@ def replacement_valid(oracle, replacer_derivable_strings, replacee, trees : Pars
         random.shuffle(replaced_strings)
 
     # Return True if all the replaced_strings are valid
+    idx = 0
     for s in replaced_strings:
+        idx += 1
         try:
             oracle.parse(s)
         except:
+            with open("first_reject_log.csv", "a", encoding="utf-8") as frlog:
+                frlog.write(f"{len(replaced_strings)}|{idx}|REJECTED\n")
             return False, []
+    with open("first_reject_log.csv", "a", encoding="utf-8") as frlog:
+        frlog.write(f"{len(replaced_strings)}|{idx}|ALL_PASSED\n")
     return True, replaced_strings
 
 

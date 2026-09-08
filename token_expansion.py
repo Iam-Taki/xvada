@@ -184,12 +184,17 @@ def rules_to_add(rule_start: str, symbols: List[str] = None):
 
 
 def try_strings(oracle: ExternalOracle, candidates: List[str]):
-
+    idx = 0
     for candidate in candidates:
+        idx += 1
         try:
             oracle.parse(candidate)
         except ParseException:
+            with open("expand_reject_log.csv", "a", encoding="utf-8") as frlog:
+                frlog.write(f"{len(candidates)}|{idx}|REJECTED\n")
             return False
+    with open("expand_reject_log.csv", "a", encoding="utf-8") as frlog:
+        frlog.write(f"{len(candidates)}|{idx}|ALL_PASSED\n")
     return True
 
 def _special_symbol_candidates():

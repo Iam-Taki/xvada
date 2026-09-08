@@ -18,53 +18,43 @@ class ExternalOracle:
     exit code is 0 (no error). If the external oracle takes >3 seconds to execute,
     we conservatively assume the oracle returns True.
     """
-
     def __init__(self, command):
-        """
-        `command` is a string representing the oracle command, i.e. `command` = "readpng"
-        in the oracle call:
-            $ readpng <MY_FILE>
-        """
         self.command = command
         self.cache_set = {}
         self.parse_calls = 0
         self.real_calls = 0
         self.time_spent = 0
-        if command=="liquid":
+        if command == "liquid":
             from liquid import Environment
             self._environment_class = Environment
 
     def _parse_internal(self, string):
-        """
-        Does the work of calling the subprocess.
-        """
-        self.real_calls +=1
-        if self.command=="liquid":
+        self.real_calls += 1
+        if self.command == "liquid":
             try:
                 self._environment_class().from_string(string)
                 return True
             except Exception:
                 return False
         FNULL = open(os.devnull, 'w')
-        f = tempfile.NamedTemporaryFile()
+        f = tempfile.NamedTemporaryFile(delete=False)
         f.write(bytes(string, 'utf-8'))
         f_name = f.name
         f.flush()
+        f.close()
         try:
-            # With check = True, throws a CalledProcessError if the exit code is non-zero
-            # ["python3", self.command, f_name] for .py oracle
-            subprocess.run([self.command, f_name], stdout=FNULL, stderr=FNULL, check=True)#, timeout=10)
-            f.close()
+            subprocess.run(f'{self.command} "{f_name}"', shell=True, stdout=FNULL, stderr=FNULL, check=True)
             FNULL.close()
+            os.remove(f_name)
             return True
         except subprocess.CalledProcessError as e:
-            f.close()
             FNULL.close()
+            os.remove(f_name)
             return False
         except subprocess.TimeoutExpired as e:
             print(f"Caused timeout: {string}")
-            f.close()
             FNULL.close()
+            os.remove(f_name)
             return True
 
     def parse(self, string, timeout=3):
@@ -73,7 +63,9 @@ class ExternalOracle:
         """
         self.parse_calls += 1
         if string in self.cache_set:
-            if self.cache_set[string]:
+            result = self.cache_set[string]
+            self._log(string, result, cached=True)
+            if result:
                 return True
             else:
                 raise ParseException(f"doesn't parse: {string}")
@@ -82,16 +74,24 @@ class ExternalOracle:
             res = self._parse_internal(string)
             self.time_spent += time.time() - s
             self.cache_set[string] = res
+            self._log(string, res, cached=False)
             if res:
                 return True
             else:
                 raise ParseException(f"doesn't parse: {string}")
 
+    def _log(self, string, result, cached):
+        try:
+            with open("oracle_log.csv", "a", encoding="utf-8") as logf:
+                preview = string[:50].replace("\n", " ").replace("|", "_")
+                logf.write(f"{self.parse_calls}|{len(string)}|{result}|{cached}|{preview}\n")
+        except Exception:
+            pass
+
 class CachingOracle:
     """
     Wraps a "Lark" parser object to provide caching of previous calls.
     """
-
     def __init__(self, oracle: Lark):
         self.oracle = oracle
         self.cache_set = {}
